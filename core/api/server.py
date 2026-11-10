@@ -1301,7 +1301,7 @@ async def _process_email_job(job_id: str) -> None:
 
 
 async def _send_leads_to_flare(parent_job_id: str) -> None:
-    """Send a finished crawl's leads (has an email, not a chain, not far off) to Flare."""
+    """Send a finished crawl's leads (not chains, not far off) to Flare."""
     parent = await queue_manager.get_crawl_job(parent_job_id)
     if not parent or not parent.send_to_flare or not parent.results:
         return

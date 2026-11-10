@@ -434,6 +434,7 @@ def lead_for_flare(company: dict[str, Any]) -> dict[str, Any]:
         "All emails": ", ".join(emails) if len(emails) > 1 else "",
         "Owner name found on": na(company.get("owner_source")),
         "Hours": na(company.get("opening_hours")),
+        "Contact page": na(company.get("contact_page")),
         "Note": na(company.get("chain_note")),
     }
     lead = {
@@ -457,21 +458,34 @@ def lead_for_flare(company: dict[str, Any]) -> dict[str, Any]:
         lead["extra"]["Trade"] = na(company.get("category")) or ""
         lead["extra"]["Note"] = "; ".join(x for x in (f"{page} page only, no website", lead["extra"].get("Note", "")) if x)
         lead["extra"] = {k: v for k, v in lead["extra"].items() if v}
+    elif website and not emails:
+        # No email on the site: reach them through its contact form
+        lead["category"] = "Contact form only"
+        lead["extra"]["Trade"] = na(company.get("category")) or ""
+        note = "No email on the website; use its contact form"
+        if company.get("website_builder", "").startswith("Unknown (site didn't load)"):
+            note = "Website didn't load when crawled; may be down"
+        lead["extra"]["Note"] = "; ".join(x for x in (note, lead["extra"].get("Note", "")) if x)
+        lead["extra"] = {k: v for k, v in lead["extra"].items() if v}
     return {k: v for k, v in lead.items() if v not in ("", None, {})}
 
 
 def leads_to_send(companies: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Which results go to Flare: has an email, isn't a chain, isn't far from the area searched."""
-    counts = {"no_email": 0, "chain": 0, "outside_area": 0}
+    """Which results go to Flare: everything that isn't a chain or far from the area searched.
+
+    Businesses without an email still go, under "Contact form only" (or "Facebook only").
+    The counts say how many were left out, and how many of those sent had no email.
+    """
+    counts = {"chain": 0, "outside_area": 0, "form_only": 0}
     keep = []
     for company in companies:
-        if not (company.get("emails") or []):
-            counts["no_email"] += 1
-        elif company.get("chain"):
+        if company.get("chain"):
             counts["chain"] += 1
         elif company.get("outside_area"):
             counts["outside_area"] += 1
         else:
+            if not (company.get("emails") or []):
+                counts["form_only"] += 1
             keep.append(lead_for_flare(company))
     return keep, counts
 

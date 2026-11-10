@@ -243,6 +243,17 @@ class EmailExtractor:
             html = await page.content()
             found_emails = self._extract_emails_from_html(html)
 
+            # The site's contact page, for businesses that only have a form
+            if "contact_page" not in self._site:
+                try:
+                    href = await page.eval_on_selector(
+                        "a[href*='contact' i]", "a => a.href"
+                    )
+                    if href and href.startswith("http"):
+                        self._site["contact_page"] = href.split("#")[0]
+                except Exception:
+                    pass
+
             # Builder from the homepage; owner from the first page that names one
             if "website_builder" not in self._site:
                 self._site["website_builder"] = detect_builder(url, html)
@@ -392,6 +403,9 @@ class EmailExtractor:
                 pages_crawled += 1
 
                 await self._crawl_page(page, link_normalized, company_name, job_id, base_domain)
+
+            # The homepage never loaded (site down, connection refused)
+            self._site.setdefault("website_builder", "Unknown (site didn't load)")
 
             logger.info("Email crawl completed for %s: %d unique emails found",
                         homepage, len(self._emails))

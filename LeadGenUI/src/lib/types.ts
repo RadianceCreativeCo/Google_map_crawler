@@ -9,7 +9,7 @@ export interface FlareImport {
   skipped?: number;
   sent?: number;
   error?: string | null;
-  left_out?: { no_email?: number; chain?: number; outside_area?: number };
+  left_out?: { chain?: number; outside_area?: number; form_only?: number };
   at?: string;
 }
 

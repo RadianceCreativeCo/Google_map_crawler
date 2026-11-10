@@ -31,7 +31,7 @@ class CrawlRequest(BaseModel):
     """Request model for starting a new crawl."""
     prompt: str = Field(..., min_length=1, description="What to search for on Google Maps, e.g. \"plumbers\"")
     city: Optional[str] = Field(default=None, description="Where, e.g. \"South Bend, IN\". Added to the search; results far from it are left out of Flare")
-    send_to_flare: bool = Field(default=True, description="Send leads with an email (not chains) to Flare's Leads page when the email crawl finishes")
+    send_to_flare: bool = Field(default=True, description="Send leads (not chains, not far away) to Flare's Leads page when the email crawl finishes")
     output_format: OutputFormat = Field(default=OutputFormat.JSON, description="Output format")
     headless: bool = Field(default=False, description="Run in headless mode")
     locale: str = Field(default="en-US", description="Browser locale")

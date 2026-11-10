@@ -556,6 +556,7 @@ class QueueManager:
             company["website_builder"] = info.get("website_builder", "")
             company["owner_name"] = info.get("owner_name", "")
             company["owner_source"] = info.get("owner_source", "")
+            company["contact_page"] = info.get("contact_page", "")
         drop_shared_emails(results)
         mark_chains(results)
         mark_area(results)

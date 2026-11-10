@@ -105,7 +105,7 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
             <div className="space-y-0.5">
               <p className="text-sm font-medium">Send to Flare</p>
               <p className="text-xs text-muted-foreground">
-                Businesses with an email, no chains, nothing far away
+                Everything except chains and far-away results
               </p>
             </div>
             <Switch

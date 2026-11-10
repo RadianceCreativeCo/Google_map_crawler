@@ -394,7 +394,7 @@ export default function CombinedTable({ refreshTrigger }: CombinedTableProps) {
                                   : `Flare: ${job.flare_import.added ?? 0} added, ${job.flare_import.already_there ?? 0} already there`}
                                 {job.flare_import.left_out ? (
                                   <span className="text-muted-foreground">
-                                    {` · left out ${job.flare_import.left_out.no_email ?? 0} no email, ${job.flare_import.left_out.chain ?? 0} chains, ${job.flare_import.left_out.outside_area ?? 0} far away`}
+                                    {` · ${job.flare_import.left_out.form_only ?? 0} contact form only · left out ${job.flare_import.left_out.chain ?? 0} chains, ${job.flare_import.left_out.outside_area ?? 0} far away`}
                                   </span>
                                 ) : null}
                               </div>
@@ -629,7 +629,7 @@ export default function CombinedTable({ refreshTrigger }: CombinedTableProps) {
                                                 : row.outside_area
                                                   ? `Far away${row.miles_away ? ` (${row.miles_away} mi)` : ""}`
                                                   : row.email_status === "completed" && !(row.emails && row.emails.length)
-                                                    ? "No email"
+                                                    ? "Contact form only"
                                                     : row.emails && row.emails.length
                                                       ? "Lead"
                                                       : "-"}

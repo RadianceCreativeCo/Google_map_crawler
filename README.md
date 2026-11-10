@@ -17,7 +17,7 @@ This fork is set up for finding US small-business leads and sending them to Flar
 
 **What a crawl does:** searches Google Maps in English (US) for a kind of business in a city, visits each business's website for email addresses, notes the website builder (Wix, Squarespace, GoDaddy, WordPress…) and any owner name written on the site, then sends the good ones to Flare's Leads page.
 
-**Sent to Flare:** businesses with at least one email, that aren't chains or franchises, and are within 40 miles of the middle of the results. The owner's name fills the lead's contact name. Facebook-only businesses get the category "Facebook only". No AI is used, so crawls cost nothing.
+**Sent to Flare:** every business that isn't a chain or franchise and is within 40 miles of the middle of the results. The owner's name fills the lead's contact name. Businesses with no email on their website get the category "Contact form only" (with a link to their contact page), and Facebook-only businesses get "Facebook only"; their trade is kept in the lead's details. No AI is used, so crawls cost nothing.
 
 **Start it (Docker / OrbStack running):**
 
