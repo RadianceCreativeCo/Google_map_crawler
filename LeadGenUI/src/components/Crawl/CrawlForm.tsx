@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 
 interface CrawlFormProps {
   onCrawlStarted: (response: CrawlResponse) => void;
@@ -108,17 +107,37 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
                 Everything except chains and far-away results
               </p>
             </div>
-            <Switch
-              checked={sendToFlare && autoEmailCrawl}
-              onCheckedChange={setSendToFlare}
+            <button
+              type="button"
+              onClick={() => !isLoading && autoEmailCrawl && setSendToFlare(!sendToFlare)}
               disabled={isLoading || !autoEmailCrawl}
-            />
+              className={`
+                relative inline-flex h-[22px] w-[42px] shrink-0 cursor-pointer items-center rounded-full transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+                disabled:cursor-not-allowed disabled:opacity-50
+                ${sendToFlare && autoEmailCrawl ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"}
+              `}
+              aria-label="Toggle sending to Flare"
+              aria-checked={sendToFlare && autoEmailCrawl}
+              role="switch"
+            >
+              <span
+                className={`
+                  pointer-events-none inline-block h-[18px] w-[18px] rounded-full bg-white shadow-md
+                  transform transition-transform duration-150 ease-in-out
+                  ${sendToFlare && autoEmailCrawl ? "translate-x-[22px]" : "translate-x-[2px]"}
+                `}
+              />
+            </button>
+            <span className={`text-xs font-medium select-none w-6 text-right ${sendToFlare && autoEmailCrawl ? "text-blue-600" : "text-gray-400"}`}>
+              {sendToFlare && autoEmailCrawl ? "On" : "Off"}
+            </span>
           </div>
 
           {/* Reviews Toggle - Prominent */}
           <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3">
             <div className="space-y-0.5">
-              <p className="text-sm font-medium">Review Collection</p>
+              <p className="text-sm font-medium">Reviews</p>
               <p className="text-xs text-muted-foreground">
                 Collects ratings and star ratings of found companies
               </p>
@@ -150,14 +169,14 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
             </span>
           </div>
 
-          {/* Email Crawling Toggle - Prominent */}
+          {/* Email crawl Toggle - Prominent */}
           <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3">
             <div className="space-y-0.5">
               <p className="text-sm font-medium flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                Email Crawling
+                Email crawl
               </p>
               <p className="text-xs text-muted-foreground">
                 Automatically crawl websites of found companies to extract contact emails
@@ -192,10 +211,10 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
 
           {/* Options Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Max Results */}
+            {/* Max results */}
             <div className="space-y-1.5">
               <Label htmlFor="maxResults" className="text-xs text-muted-foreground">
-                Max Results
+                Max results
               </Label>
               <Input
                 id="maxResults"
@@ -209,25 +228,7 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
               />
             </div>
 
-            {/* Headless Toggle */}
-            <div className="flex items-center pt-6">
-              <Switch
-                checked={headless}
-                onCheckedChange={setHeadless}
-                disabled={isLoading}
-              />
-            </div>
           </div>
-
-          {/* Info hint when reviews are disabled */}
-          {!trackReviews && (
-            <div className="flex items-center gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-600">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Reviews are disabled - crawl runs faster but no review data will be collected.
-            </div>
-          )}
 
           {/* Success Message */}
           {successMessage && (
@@ -276,7 +277,7 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
                       d="M13 10V3L4 14h7v7l9-11h-7z"
                     />
                   </svg>
-                  Start Crawl
+                  Start crawl
                 </>
               )}
             </Button>

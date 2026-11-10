@@ -11,6 +11,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Flare accents in place of the original blue and green
+        blue: { 50: "#fbefeb", 100: "#f6dcd4", 200: "#eebcae", 300: "#e59b87", 400: "#dd8068", 500: "#D6654A", 600: "#c4553b", 700: "#a44532", 800: "#84392b", 900: "#6b3025", 950: "#4a2119" },
+        emerald: { 50: "#f2f4ef", 100: "#e3e7dc", 200: "#c9d0bd", 300: "#adb79c", 400: "#9aa585", 500: "#8A9574", 600: "#737d60", 700: "#5d654e", 800: "#4b513f", 900: "#3e4335", 950: "#2a2d24" },
+        charcoal: "#2F2F2F",
+        linen: "#E8DDC7",
+        gold: "#F4B63D",
+        ember: "#D6654A",
+        sage: "#8A9574",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

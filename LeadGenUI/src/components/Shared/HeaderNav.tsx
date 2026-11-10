@@ -20,21 +20,13 @@ export default function HeaderNav({ crawlerOnline, stats }: HeaderNavProps) {
   const pathname = usePathname();
 
   return (
-    <header className="border-b border-border/50 sticky top-0 bg-background/95 backdrop-blur-sm z-50">
+    <header className="sticky top-0 z-50 bg-charcoal text-linen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-12 gap-4">
           <div className="flex items-center gap-2.5">
-            <Link href="/" className="flex items-center gap-2.5">
-              <img
-                src="/SherlockMaps.png"
-                alt="SherlockMaps"
-                className="w-10 h-10 object-contain"
-              />
-              <div>
-                <h1 className="text-sm font-medium text-foreground leading-none">
-                  SherlockMaps
-                </h1>
-              </div>
+            <Link href="/" className="flex items-baseline gap-1.5">
+              <h1 className="text-base font-semibold leading-none tracking-tight text-linen">Flare</h1>
+              <span className="text-base font-normal leading-none text-linen/60">crawler</span>
             </Link>
 
             {/* Navigation */}
@@ -51,8 +43,8 @@ export default function HeaderNav({ crawlerOnline, stats }: HeaderNavProps) {
                     className={cn(
                       "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
                       active
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        ? "bg-linen/15 text-linen"
+                        : "text-linen/65 hover:text-linen hover:bg-linen/10"
                     )}
                   >
                     {item.label}
@@ -68,16 +60,16 @@ export default function HeaderNav({ crawlerOnline, stats }: HeaderNavProps) {
               <div
                 className={cn(
                   "w-1.5 h-1.5 rounded-full",
-                  crawlerOnline ? "bg-emerald-500" : "bg-red-500"
+                  crawlerOnline ? "bg-sage" : "bg-ember"
                 )}
               />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-linen/65">
                 {crawlerOnline ? "Online" : "Offline"}
               </span>
             </div>
             {stats && (
-              <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                {stats.total_crawls} Crawls
+              <Badge variant="secondary" className="text-xs h-5 px-1.5 bg-linen/15 text-linen border-0">
+                {stats.total_crawls} crawls
               </Badge>
             )}
           </div>

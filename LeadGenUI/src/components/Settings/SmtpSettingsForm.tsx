@@ -217,7 +217,7 @@ export default function SmtpSettingsForm() {
               type="text"
               value={settings.from_name}
               onChange={(e) => set("from_name", e.target.value)}
-              placeholder="SherlockMaps"
+              placeholder="Radiance Creative Co."
               className="h-9 text-sm"
             />
           </div>

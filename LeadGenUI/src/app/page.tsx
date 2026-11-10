@@ -46,7 +46,7 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
           <div className="inline-block w-5 h-5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading SherlockMaps...</p>
+          <p className="text-muted-foreground text-sm">Loading…</p>
         </div>
       </div>
     );
@@ -80,7 +80,7 @@ export default function Home() {
       <footer className="border-t border-border/50 mt-8 py-3">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>SherlockMaps</span>
+            <span>Flare crawler</span>
             <span>
               {process.env.NEXT_PUBLIC_CRAWLER_API_URL || "http://localhost:8000"}
             </span>

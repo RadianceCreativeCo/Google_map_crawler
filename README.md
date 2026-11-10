@@ -1,15 +1,6 @@
-<div align="center">
-  <img src="public/SherlockMaps.png" alt="SherlockMaps Icon" width="200">
-</div>
+# Flare crawler
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Playwright](https://img.shields.io/badge/browser--automation-playwright-green.svg)](https://playwright.dev/)
-
-A professional, open-source Google Maps web crawler that extracts company information from Google Maps. Built with [Playwright](https://playwright.dev/) for browser automation.
-
-<div align="center">
-  <h2>Sherlock Maps</h2>
-  <p>Open-Source Google Maps Webcrawler</p>
-</div>
+Google Maps lead crawler for Radiance Creative Co. Based on [SherlockMaps](https://github.com/Ayyouboss0011/SherlockMaps) (MIT License).
 
 ## Radiance Creative Co. setup
 
