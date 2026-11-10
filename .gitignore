@@ -50,3 +50,8 @@ core/.git
 Thumbs.db
 
 # LeadGenUI (see LeadGenUI/.gitignore for its own exclusions)
+
+# Browser profiles hold cookies and saved logins; never commit them
+core/Chrome_Profile/
+Chrome_Profile/
+.env
