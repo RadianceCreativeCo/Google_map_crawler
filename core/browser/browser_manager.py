@@ -198,8 +198,11 @@ class BrowserManager:
         Returns:
             A URL-friendly search string.
         """
-        formatted = prompt.replace(" ", "+")
-        return f"https://www.google.com/maps/search/{formatted}?hl=de"
+        from urllib.parse import quote_plus
+
+        # English, United States: the extractor reads English labels, and US results
+        # keep Google from mixing in other countries.
+        return f"https://www.google.com/maps/search/{quote_plus(prompt)}?hl=en&gl=us"
 
     def _handle_consent_banner(self) -> None:
         """Attempt to accept the Google consent banner if present."""
@@ -208,6 +211,7 @@ class BrowserManager:
 
         try:
             consent_button = self._page.locator(
+                'button[aria-label*="Accept all"], button:has-text("Accept all"), '
                 'button[aria-label*="Alle akzeptieren"], button:has-text("Alle akzeptieren")'
             )
             if consent_button.count() > 0:

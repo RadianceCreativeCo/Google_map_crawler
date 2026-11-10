@@ -29,10 +29,15 @@ class CrawlJob:
     """Represents a single crawl job."""
 
     def __init__(self, prompt: str, output_format: str = "json", headless: bool = False,
-                 locale: str = "de-DE", max_results: Optional[int] = None,
-                 track_reviews: bool = True, auto_email_crawl: bool = False) -> None:
+                 locale: str = "en-US", max_results: Optional[int] = None,
+                 track_reviews: bool = True, auto_email_crawl: bool = False,
+                 city: Optional[str] = None, send_to_flare: bool = False) -> None:
         self.job_id: str = str(uuid.uuid4())
         self.prompt: str = prompt
+        self.city: Optional[str] = city
+        self.send_to_flare: bool = send_to_flare
+        # What happened when the leads went to Flare (added, already_there, chain…)
+        self.flare_import: Optional[dict[str, Any]] = None
         self.output_format: str = output_format
         self.headless: bool = headless
         self.locale: str = locale
@@ -79,6 +84,9 @@ class CrawlJob:
             "max_results": self.max_results,
             "track_reviews": self.track_reviews,
             "auto_email_crawl": self.auto_email_crawl,
+            "city": self.city,
+            "send_to_flare": self.send_to_flare,
+            "flare_import": self.flare_import,
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
@@ -138,6 +146,9 @@ def _serialize_crawl_job(job: CrawlJob) -> dict[str, Any]:
         "max_results": job.max_results,
         "track_reviews": job.track_reviews,
         "auto_email_crawl": job.auto_email_crawl,
+        "city": job.city,
+        "send_to_flare": job.send_to_flare,
+        "flare_import": job.flare_import,
         "status": job.status.value,
         "created_at": job.created_at.isoformat(),
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
@@ -231,11 +242,14 @@ class QueueManager:
             prompt=raw.get("prompt", ""),
             output_format=raw.get("output_format", "json"),
             headless=raw.get("headless", False),
-            locale=raw.get("locale", "de-DE"),
+            locale=raw.get("locale", "en-US"),
             max_results=raw.get("max_results"),
             track_reviews=raw.get("track_reviews", True),
             auto_email_crawl=raw.get("auto_email_crawl", False),
+            city=raw.get("city"),
+            send_to_flare=raw.get("send_to_flare", False),
         )
+        job.flare_import = raw.get("flare_import")
         job.job_id = raw.get("job_id") or job.job_id
         try:
             job.status = JobStatus(raw.get("status", JobStatus.CANCELLED.value))
@@ -349,11 +363,14 @@ class QueueManager:
         return self._active_email_job
 
     async def add_job(self, prompt: str, output_format: str = "json", headless: bool = False,
-                      locale: str = "de-DE", max_results: Optional[int] = None,
-                      track_reviews: bool = True, auto_email_crawl: bool = False) -> CrawlJob:
+                      locale: str = "en-US", max_results: Optional[int] = None,
+                      track_reviews: bool = True, auto_email_crawl: bool = False,
+                      city: Optional[str] = None, send_to_flare: bool = False) -> CrawlJob:
         """Add a new crawl job to the queue."""
         async with self._lock:
             job = CrawlJob(
+                city=city,
+                send_to_flare=send_to_flare,
                 prompt=prompt,
                 output_format=output_format,
                 headless=headless,
@@ -442,7 +459,8 @@ class QueueManager:
                     company["email_status"] = "failed"
                 self._save_jobs()
 
-    async def complete_email_job(self, job_id: str, results: list[dict[str, Any]]) -> None:
+    async def complete_email_job(self, job_id: str, results: list[dict[str, Any]],
+                                 sites: Optional[dict[str, dict[str, Any]]] = None) -> None:
         """Mark an email crawl job as completed.
         
         This method merges the email results into the parent crawl job results
@@ -516,7 +534,42 @@ class QueueManager:
                             company["emails"] = []
                             company["email"] = ""
 
+                    if sites is not None:
+                        self._apply_lead_rules(parent_job, sites)
+
                     self._save_jobs()
+
+    @staticmethod
+    def _apply_lead_rules(parent_job: "CrawlJob", sites: dict[str, dict[str, Any]]) -> None:
+        """Each business's own emails, builder and owner; chains and far-off results marked."""
+        from core.leads import clean_emails, drop_shared_emails, drop_vendor_emails, mark_area, mark_chains, pick_email
+
+        results = parent_job.results or []
+        for company in results:
+            info = sites.get(company.get("website", "")) or {}
+            if "emails" in info:
+                # The emails found on this business's own site (more exact than matching by name)
+                company["emails"] = clean_emails(info["emails"])
+            else:
+                company["emails"] = clean_emails(company.get("emails") or [])
+            company["emails"] = drop_vendor_emails(company["emails"], company.get("website", ""), company.get("name", ""))
+            company["website_builder"] = info.get("website_builder", "")
+            company["owner_name"] = info.get("owner_name", "")
+            company["owner_source"] = info.get("owner_source", "")
+        drop_shared_emails(results)
+        mark_chains(results)
+        mark_area(results)
+        for company in results:
+            company["email_primary"] = pick_email(company["emails"], company.get("website", ""))
+            company["email"] = ", ".join(company["emails"])
+
+    async def set_flare_import(self, job_id: str, outcome: dict[str, Any]) -> None:
+        """Remember what happened when a crawl's leads were sent to Flare."""
+        async with self._lock:
+            job = self._crawl_jobs.get(job_id)
+            if job:
+                job.flare_import = outcome
+                self._save_jobs()
 
     async def fail_job(self, job_id: str, error: str) -> None:
         """Mark a crawl job as failed."""

@@ -19,6 +19,7 @@ from urllib.parse import urljoin, urlparse
 from playwright.async_api import Browser, BrowserContext, Page
 
 from core.models import EmailData
+from core.leads import clean_emails, detect_builder, find_owner, is_social
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,8 @@ EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 # Keywords that indicate important pages for email discovery
 IMPORTANT_PAGE_KEYWORDS = [
-    "kontakt", "contact", "impressum", "about", "ueber", "about-us",
-    "team", "about-us", "about-us/", "uber-uns", "uber uns", "support",
-    "help", "faq", "erreichbar", "email", "write", "message",
+    "contact", "about", "team", "owner", "staff", "our-story", "meet", "who-we-are",
+    "kontakt", "impressum", "support", "email", "message", "quote", "estimate",
 ]
 
 
@@ -68,7 +68,7 @@ class EmailCrawlerConfig:
     chrome_profile_path: str = ""
     page_timeout: int = 15000
     crawl_delay: float = 1.5
-    max_pages_per_domain: int = 20
+    max_pages_per_domain: int = 8
     max_total_pages: int = 200
     timeout_per_website: int = 300
     extract_from_homepage_only: bool = False
@@ -97,6 +97,9 @@ class EmailExtractor:
         self._visited_urls: Set[str] = set()
         self._pending_links: list[str] = []
         self._browser_context: Optional[BrowserContext] = None
+        # website -> {"website_builder", "owner_name", "owner_source"}
+        self.sites: dict[str, dict[str, str]] = {}
+        self._site: dict[str, str] = {}
 
     async def __aenter__(self) -> "EmailExtractor":
         """Async context manager entry."""
@@ -205,9 +208,17 @@ class EmailExtractor:
         Returns:
             List of found email addresses.
         """
-        found_emails = EMAIL_PATTERN.findall(html)
-        # Normalize emails
-        return [email.strip().lower() for email in found_emails if "@" in email and "." in email.split("@")[-1]]
+        found = EMAIL_PATTERN.findall(html)
+        # Cloudflare hides addresses as data-cfemail="hex" or /cdn-cgi/l/email-protection#hex
+        for code in re.findall(r'(?:data-cfemail="|email-protection#)([0-9a-fA-F]{6,})', html):
+            try:
+                key = int(code[:2], 16)
+                found.append("".join(chr(int(code[i:i + 2], 16) ^ key) for i in range(2, len(code), 2)))
+            except ValueError:
+                pass
+        # mailto: links sometimes hide the address from the plain text
+        found += re.findall(r"mailto:([^\"'?>\s]+)", html, flags=re.I)
+        return clean_emails(found)
 
     async def _crawl_page(self, page: Page, url: str, company_name: str,
                           job_id: str, source_domain: str) -> list[str]:
@@ -226,11 +237,24 @@ class EmailExtractor:
         try:
             await page.goto(url, timeout=self.config.page_timeout, wait_until="domcontentloaded")
             # Wait a bit for dynamic content to load
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(1200)
 
             # Get the page content
             html = await page.content()
             found_emails = self._extract_emails_from_html(html)
+
+            # Builder from the homepage; owner from the first page that names one
+            if "website_builder" not in self._site:
+                self._site["website_builder"] = detect_builder(url, html)
+            if not self._site.get("owner_name"):
+                try:
+                    text = await page.inner_text("body", timeout=3000)
+                except Exception:
+                    text = ""
+                owner = find_owner(text)
+                if owner:
+                    self._site["owner_name"] = owner
+                    self._site["owner_source"] = url
 
             self.stats.urls_crawled += 1
 
@@ -267,8 +291,8 @@ class EmailExtractor:
                                 and normalized not in self._pending_links):
                             self._pending_links.append(normalized)
 
-            # Rate limiting
-            await page.wait_for_timeout(int(self.config.crawl_delay * 1000))
+            # A short pause between pages of the same site
+            await page.wait_for_timeout(500)
 
             return found_emails
 
@@ -299,6 +323,8 @@ class EmailExtractor:
         self._emails = {}
         self._visited_urls = set()
         self._pending_links = []
+        self._site = {}
+        self.sites[website_url] = self._site
 
         # Normalize the URL
         normalized_url = self._normalize_url(website_url)
@@ -354,6 +380,9 @@ class EmailExtractor:
             for link in prioritized_links:
                 if pages_crawled >= self.config.max_pages_per_domain:
                     break
+                # Past the contact/about pages, only keep looking while no email has turned up
+                if link not in important_links and self._emails:
+                    break
 
                 link_normalized = self._normalize_url(link)
                 if link_normalized in self._visited_urls:
@@ -395,10 +424,16 @@ class EmailExtractor:
                 logger.debug("Skipping company '%s' - no valid website", company_name)
                 continue
 
+            # Facebook/Instagram pages need a login and only waste time
+            if is_social(website):
+                self.sites[website] = {"website_builder": detect_builder(website, "")}
+                continue
+
             logger.info("Crawling website %d/%d: %s", i + 1, len(websites), website)
 
             try:
                 emails = await self.crawl_website(website, company_name, job_id)
+                self.sites.setdefault(website, {})["emails"] = [e.email for e in emails]
                 for email in emails:
                     all_emails[email.email] = email
             except Exception as e:
@@ -428,6 +463,20 @@ async def extract_emails_from_websites(
     Returns:
         List of email dictionaries.
     """
+    emails, _ = await crawl_sites_for_leads(websites, job_id, config)
+    return emails
+
+
+async def crawl_sites_for_leads(
+    websites: list[dict],
+    job_id: str,
+    config: Optional[EmailCrawlerConfig] = None,
+) -> tuple[list[dict], dict[str, dict[str, str]]]:
+    """Emails from each website, plus per website its builder and any owner name found.
+
+    Returns:
+        (email dictionaries, {website: {"website_builder", "owner_name", "owner_source"}})
+    """
     async with EmailExtractor(config) as crawler:
         emails = await crawler.crawl_websites(websites, job_id)
-        return [email.to_dict() for email in emails]
+        return [email.to_dict() for email in emails], crawler.sites

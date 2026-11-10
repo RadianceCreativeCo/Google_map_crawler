@@ -3,8 +3,20 @@
 export type OutputFormat = "json" | "csv" | "pretty" | "file" | "print";
 export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
+export interface FlareImport {
+  added?: number;
+  already_there?: number;
+  skipped?: number;
+  sent?: number;
+  error?: string | null;
+  left_out?: { no_email?: number; chain?: number; outside_area?: number };
+  at?: string;
+}
+
 export interface CrawlRequest {
   prompt: string;
+  city?: string;
+  send_to_flare?: boolean;
   output_format?: OutputFormat;
   headless?: boolean;
   locale?: string;
@@ -44,6 +56,8 @@ export interface JobResultResponse {
   auto_email_crawl?: boolean;
   email_job_status?: string | null;
   emails_found?: number | null;
+  city?: string | null;
+  flare_import?: FlareImport | null;
 }
 
 export interface HealthResponse {
@@ -104,6 +118,8 @@ export interface HistoryEntry {
   auto_email_crawl?: boolean;
   email_job_status?: string | null;
   emails_found?: number | null;
+  city?: string | null;
+  flare_import?: FlareImport | null;
 }
 
 export interface HistoryResponse {

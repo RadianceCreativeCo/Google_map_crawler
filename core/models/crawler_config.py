@@ -41,7 +41,7 @@ class CrawlerConfig:
         output_format: The output format - one of "json", "csv", "pretty", "file", "print".
         chrome_profile_path: Path to the Chrome user data directory.
         viewport: The browser viewport dimensions.
-        locale: The browser locale (e.g., "de-DE").
+        locale: The browser locale (e.g., "en-US").
         page_timeout: Maximum navigation timeout in milliseconds.
         selector_timeout: Maximum timeout for selector waits in milliseconds.
         scroll_timeout: Maximum time for scrolling through results in seconds.
@@ -56,7 +56,7 @@ class CrawlerConfig:
     output_format: Literal["json", "csv", "pretty", "file", "print"] = "json"
     chrome_profile_path: str = field(default="")
     viewport: ViewPort = field(default_factory=lambda: ViewPort())
-    locale: str = "de-DE"
+    locale: str = "en-US"
     page_timeout: int = 30000
     selector_timeout: int = 15000
     scroll_timeout: int = 45

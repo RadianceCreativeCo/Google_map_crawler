@@ -91,6 +91,7 @@ class CompanyData:
     reviews: List[ReviewData] = field(default_factory=lambda: [])
     email_status: str = "not_started"
     emails: List[str] = field(default_factory=list)
+    maps_url: str = "N/A"
 
     def to_dict(self) -> dict[str, str | List[str] | List[dict]]:
         """Convert the company data to a dictionary.
@@ -112,6 +113,7 @@ class CompanyData:
             "reviews": [r.to_dict() for r in self.reviews],
             "email_status": self.email_status,
             "emails": self.emails,
+            "maps_url": self.maps_url,
         }
 
     def has_valid_website(self) -> bool:

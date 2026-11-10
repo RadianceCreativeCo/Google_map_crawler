@@ -29,13 +29,15 @@ class JobStatus(str, Enum):
 
 class CrawlRequest(BaseModel):
     """Request model for starting a new crawl."""
-    prompt: str = Field(..., min_length=1, description="Search term for Google Maps")
+    prompt: str = Field(..., min_length=1, description="What to search for on Google Maps, e.g. \"plumbers\"")
+    city: Optional[str] = Field(default=None, description="Where, e.g. \"South Bend, IN\". Added to the search; results far from it are left out of Flare")
+    send_to_flare: bool = Field(default=True, description="Send leads with an email (not chains) to Flare's Leads page when the email crawl finishes")
     output_format: OutputFormat = Field(default=OutputFormat.JSON, description="Output format")
     headless: bool = Field(default=False, description="Run in headless mode")
-    locale: str = Field(default="de-DE", description="Browser locale")
+    locale: str = Field(default="en-US", description="Browser locale")
     max_results: Optional[int] = Field(default=None, ge=1, description="Maximum number of results")
-    track_reviews: bool = Field(default=True, description="Whether to track and extract reviews for each company")
-    auto_email_crawl: bool = Field(default=False, description="Automatically start email crawl after successful map crawl")
+    track_reviews: bool = Field(default=False, description="Whether to track and extract reviews for each company (slow)")
+    auto_email_crawl: bool = Field(default=True, description="Automatically start email crawl after successful map crawl")
 
 
 class CrawlResponse(BaseModel):
@@ -54,6 +56,8 @@ class JobResultResponse(BaseModel):
     job_id: str
     status: JobStatus
     prompt: str
+    city: Optional[str] = None
+    flare_import: Optional[dict[str, Any]] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
     results: Optional[List[dict[str, Any]]] = None
@@ -127,6 +131,8 @@ class HistoryEntry(BaseModel):
     auto_email_crawl: bool = False
     email_job_status: Optional[str] = None
     emails_found: Optional[int] = None
+    city: Optional[str] = None
+    flare_import: Optional[dict[str, Any]] = None
 
 
 class HistoryResponse(BaseModel):

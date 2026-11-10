@@ -16,9 +16,11 @@ interface CrawlFormProps {
 
 export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
   const [prompt, setPrompt] = useState("");
+  const [city, setCity] = useState("");
   const [headless, setHeadless] = useState(false);
-  const [trackReviews, setTrackReviews] = useState(true);
-  const [autoEmailCrawl, setAutoEmailCrawl] = useState(false);
+  const [trackReviews, setTrackReviews] = useState(false);
+  const [autoEmailCrawl, setAutoEmailCrawl] = useState(true);
+  const [sendToFlare, setSendToFlare] = useState(true);
   const [maxResults, setMaxResults] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,6 +40,8 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
     try {
       const response = await crawlerApi.startCrawl({
         prompt: prompt.trim(),
+        city: city.trim() || undefined,
+        send_to_flare: sendToFlare && autoEmailCrawl,
         headless,
         track_reviews: trackReviews,
         auto_email_crawl: autoEmailCrawl,
@@ -49,7 +53,6 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
       onCrawlStarted(response);
       setPrompt("");
       setMaxResults("");
-      setAutoEmailCrawl(false);
 
       setTimeout(() => setSuccessMessage(""), 5000);
     } catch (err: any) {
@@ -68,16 +71,47 @@ export default function CrawlForm({ onCrawlStarted, onError }: CrawlFormProps) {
           {/* Prompt */}
           <div className="space-y-1.5">
             <Label htmlFor="prompt" className="text-xs text-muted-foreground">
-              Search Term
+              Kind of business
             </Label>
             <Input
               id="prompt"
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g. Restaurants Berlin"
+              placeholder="e.g. Plumbers"
               disabled={isLoading}
               className="h-9 text-sm"
+            />
+          </div>
+
+          {/* City */}
+          <div className="space-y-1.5">
+            <Label htmlFor="city" className="text-xs text-muted-foreground">
+              City
+            </Label>
+            <Input
+              id="city"
+              type="text"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="e.g. South Bend, IN"
+              disabled={isLoading}
+              className="h-9 text-sm"
+            />
+          </div>
+
+          {/* Send to Flare */}
+          <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">Send to Flare</p>
+              <p className="text-xs text-muted-foreground">
+                Businesses with an email, no chains, nothing far away
+              </p>
+            </div>
+            <Switch
+              checked={sendToFlare && autoEmailCrawl}
+              onCheckedChange={setSendToFlare}
+              disabled={isLoading || !autoEmailCrawl}
             />
           </div>
 

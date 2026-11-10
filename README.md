@@ -11,6 +11,27 @@ A professional, open-source Google Maps web crawler that extracts company inform
   <p>Open-Source Google Maps Webcrawler</p>
 </div>
 
+## Radiance Creative Co. setup
+
+This fork is set up for finding US small-business leads and sending them to Flare.
+
+**What a crawl does:** searches Google Maps in English (US) for a kind of business in a city, visits each business's website for email addresses, notes the website builder (Wix, Squarespace, GoDaddy, WordPress…) and any owner name written on the site, then sends the good ones to Flare's Leads page.
+
+**Sent to Flare:** businesses with at least one email, that aren't chains or franchises, and are within 40 miles of the middle of the results. The owner's name fills the lead's contact name. Facebook-only businesses get the category "Facebook only". No AI is used, so crawls cost nothing.
+
+**Start it (Docker / OrbStack running):**
+
+```bash
+cp .env.example .env     # then paste your Flare connector address into FLARE_CONNECTOR_URL
+docker compose up -d --build
+```
+
+Open http://localhost:3008, enter a kind of business ("plumbers") and a city ("South Bend, IN"), and start. When the email crawl finishes, the crawl's row shows what Flare added. The connector address comes from Flare → Team → My profile → Connect Claude. Keep it private, since anyone holding it can act as you in Flare.
+
+Reviews are off by default (they take up to two minutes per business). Rules live in `core/leads.py`.
+
+---
+
 ## Features
 
 - **Object-Oriented** - Cleanly structured with classes, dataclasses, and design patterns

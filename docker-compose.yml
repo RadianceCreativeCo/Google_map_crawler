@@ -13,6 +13,11 @@ services:
       - API_PORT=8000
       - DISPLAY=:99
       - PYTHONUNBUFFERED=1
+      # Your personal Flare connector address (Flare → Team → My profile → Connect Claude).
+      # Finished crawls send their leads to Flare's Leads page through it.
+      - FLARE_CONNECTOR_URL=${FLARE_CONNECTOR_URL:-}
+      # Results farther than this from the middle of a crawl are left out of Flare
+      - AREA_RADIUS_MILES=${AREA_RADIUS_MILES:-40}
     volumes:
       # Persist Chrome profile between runs
       - chrome_profile:/app/core/Chrome_Profile

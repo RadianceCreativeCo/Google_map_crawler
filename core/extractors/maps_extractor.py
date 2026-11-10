@@ -52,7 +52,7 @@ class MapsExtractor:
     PLUS_CODE_SELECTOR = 'button[data-item-id="oloc"] div.Io6YTe'
 
     # Review selectors
-    REVIEWS_TAB_SELECTOR = 'button[aria-label*="Rezensionen"][aria-label*="Rezensionen"]'
+    REVIEWS_TAB_SELECTOR = 'button[role="tab"][aria-label*="Reviews"]'
     REVIEW_ITEM_SELECTOR = "div.jftiEf.fontBodyMedium"
     REVIEW_AUTHOR_NAME_SELECTOR = "div.d4r55.fontTitleMedium"
     REVIEW_AUTHOR_INFO_SELECTOR = "div.RfnDt"
@@ -67,7 +67,7 @@ class MapsExtractor:
     # The outer container that holds the reviews section
     REVIEWS_SECTION_SELECTOR = "div.m6QErb.WNBkOb.XiKgde"
 
-    def __init__(self, page: Page, selector_timeout: int = 15000) -> None:
+    def __init__(self, page: Page, selector_timeout: int = 15000, max_results: int | None = None) -> None:
         """Initialize the MapsExtractor.
 
         Args:
@@ -76,6 +76,7 @@ class MapsExtractor:
         """
         self._page = page
         self._selector_timeout = selector_timeout
+        self._max_results = max_results
 
     def extract_all(self, track_reviews: bool = True) -> list[CompanyData]:
         """Extract all company data from the current Google Maps search results page.
@@ -118,8 +119,10 @@ class MapsExtractor:
 
         self._scroll_through_results()
 
-        links = self._extract_links_from_feed(parent_element)
-        return self._remove_duplicate_links(links)
+        links = self._remove_duplicate_links(self._extract_links_from_feed(parent_element))
+        if self._max_results:
+            links = links[: self._max_results]
+        return links
 
     def _wait_for_feed(self):
         """Wait for the results feed to appear.
@@ -246,9 +249,12 @@ class MapsExtractor:
                 return None
 
             # Build details dictionary
+            rating, reviews_count = self._extract_rating()
             details: dict = {
                 "name": self._safe_text(self._page.locator(self.NAME_SELECTOR)),
-                "rating": self._extract_rating(),
+                "rating": rating,
+                "reviews_count": reviews_count,
+                "maps_url": url.split("?")[0],
                 "category": self._extract_category(),
                 "address": self._safe_text(
                     self._page.locator(self.ADDRESS_CONTAINER_SELECTOR)
@@ -279,18 +285,23 @@ class MapsExtractor:
             logger.warning("Error extracting company details from %s: %s", url, e)
             return None
 
-    def _extract_rating(self) -> str:
+    def _extract_rating(self) -> tuple[str, str]:
         """Extract the company rating and review count.
 
-        Returns:
-            The rating as a string (e.g., "4.5").
-        """
-        rating_text = self._safe_text(self._page.locator(self.RATING_SELECTOR))
-        if not rating_text:
-            return "N/A"
+        The rating block reads like "4.8\n(123)" or "4.8(1,234)".
 
-        rating_match = re.search(r"([\d,\.]+)", rating_text)
-        return rating_match.group(1).replace(",", ".") if rating_match else "N/A"
+        Returns:
+            The rating (e.g., "4.5") and the number of reviews (e.g., "123"), "N/A" when missing.
+        """
+        rating_text = self._safe_text(self._page.locator(self.RATING_SELECTOR).first)
+        if not rating_text or rating_text == "N/A":
+            return "N/A", "N/A"
+
+        rating_match = re.search(r"(\d(?:[.,]\d)?)", rating_text)
+        count_match = re.search(r"\(([\d,.]+)\)", rating_text)
+        rating = rating_match.group(1).replace(",", ".") if rating_match else "N/A"
+        count = re.sub(r"[^\d]", "", count_match.group(1)) if count_match else "N/A"
+        return rating, count or "N/A"
 
     def _extract_category(self) -> str:
         """Extract the company category.
@@ -316,13 +327,13 @@ class MapsExtractor:
 
         # Try main hours container
         hours_container = self._page.locator(
-            'div[aria-label*="Öffnungszeiten"], div.MkV9'
+            'div[aria-label*="Hours"], div[aria-label*="hours"], div.t39EBf, div.MkV9'
         )
         hours_button = self._page.locator('button[jsaction*="openhours"]')
 
         if hours_container.count() > 0:
             hours_text = self._safe_text(hours_container.first)
-            if not hours_text or "Öffnungszeiten für die ganze Woche" in hours_text:
+            if not hours_text or "hours for the week" in hours_text.lower():
                 if hours_button.count() > 0:
                     try:
                         hours_button.click(timeout=2000)
@@ -334,9 +345,10 @@ class MapsExtractor:
         # Fallback selectors
         if not hours_text or hours_text == "N/A":
             fallback_selectors = [
-                'div.fontBodyMedium span[class*=""]:has-text("Öffnet")',
-                'div.fontBodyMedium span[class*=""]:has-text("Geschlossen")',
-                'div.fontBodyMedium span[class*=""]:has-text("Rund um die Uhr geöffnet")',
+                'div.fontBodyMedium span:has-text("Open 24 hours")',
+                'div.fontBodyMedium span:has-text("Opens")',
+                'div.fontBodyMedium span:has-text("Closes")',
+                'div.fontBodyMedium span:has-text("Closed")',
             ]
             for selector in fallback_selectors:
                 extracted = self._safe_text(self._page.locator(selector).first)
@@ -359,20 +371,18 @@ class MapsExtractor:
 
         # Wheelchair accessibility
         wc_locator = self._page.locator(
-            'span.google-symbols[aria-label*="Rollstuhl"], span.google-symbols[data-tooltip*="Rollstuhl"]'
+            'span.google-symbols[aria-label*="heelchair"], span.google-symbols[data-tooltip*="heelchair"]'
         )
         if wc_locator.count() > 0:
             wc_label = self._safe_attribute(wc_locator.first, "aria-label") or self._safe_attribute(
                 wc_locator.first, "data-tooltip"
             )
-            attributes.append(wc_label if wc_label else "Rollstuhlgerechter Eingang")
+            attributes.append(wc_label if wc_label else "Wheelchair accessible entrance")
 
         # On-site services
-        service_locator = self._page.locator(
-            'div.Ahnjwc:has-text("Service/Leistungen vor Ort")'
-        )
+        service_locator = self._page.locator('div.Ahnjwc:has-text("Onsite services")')
         if service_locator.count() > 0:
-            attributes.append("Service/Leistungen vor Ort")
+            attributes.append("Onsite services")
 
         return attributes if attributes else ["N/A"]
 
@@ -475,19 +485,19 @@ class MapsExtractor:
 
         # Primary selector: exact match for reviews tab with role="tab"
         # The button has aria-label like "Rezensionen zu „Company Name“"
-        reviews_tab = self._page.locator('button[role="tab"][aria-label*="Rezensionen"]')
+        reviews_tab = self._page.locator(self.REVIEWS_TAB_SELECTOR)
         if reviews_tab.count() > 0:
             try:
                 reviews_tab.first.click(timeout=3000)
                 self._page.wait_for_timeout(800)
                 clicked = True
-                logger.info("Clicked reviews tab (German selector)")
+                logger.info("Clicked reviews tab")
             except Exception as e:
-                logger.debug("Failed to click German reviews tab: %s", e)
+                logger.debug("Failed to click reviews tab: %s", e)
 
         # Fallback: try English selector
         if not clicked:
-            reviews_tab_en = self._page.locator('button[role="tab"][aria-label*="Reviews"]')
+            reviews_tab_en = self._page.locator('button[role="tab"][aria-label*="Rezensionen"]')
             if reviews_tab_en.count() > 0:
                 try:
                     reviews_tab_en.first.click(timeout=3000)

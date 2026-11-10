@@ -77,7 +77,8 @@ from core.api.excel_import import extract_emails_from_file
 from core.api.queue_manager import QueueManager
 from core.browser import BrowserManager
 from core.extractors import MapsExtractor
-from core.extractors.email_extractor import EmailCrawlerConfig, EmailExtractor, extract_emails_from_websites
+from core.extractors.email_extractor import EmailCrawlerConfig, EmailExtractor, extract_emails_from_websites, crawl_sites_for_leads
+from core.leads import leads_to_send, send_to_flare, source_name
 from core.models import CompanyData, CrawlerConfig
 from core.processors import DeduplicationProcessor, URLValidator
 
@@ -129,7 +130,7 @@ def init_browser(config_dict: dict) -> dict:
         search_prompt=config_dict.get("search_prompt", ""),
         headless=config_dict.get("headless", False),
         output_format=config_dict.get("output_format", "json"),
-        locale=config_dict.get("locale", "de-DE"),
+        locale=config_dict.get("locale", "en-US"),
         chrome_profile_path=config_dict.get("chrome_profile_path", ""),
         page_timeout=config_dict.get("page_timeout", 30000),
         selector_timeout=config_dict.get("selector_timeout", 15000),
@@ -154,8 +155,9 @@ def run_crawl_in_process(
     prompt: str,
     output_format: str = "json",
     headless: bool = False,
-    locale: str = "de-DE",
+    locale: str = "en-US",
     track_reviews: bool = True,
+    max_results: Optional[int] = None,
 ) -> list[dict[str, Any]]:
     """Run a crawl in a worker process.
 
@@ -195,7 +197,7 @@ def run_crawl_in_process(
         page = browser_mgr.navigate_to_maps(prompt)
 
         # Extract data
-        extractor = MapsExtractor(page, config.selector_timeout)
+        extractor = MapsExtractor(page, config.selector_timeout, max_results=max_results)
         raw_results = extractor.extract_all(track_reviews=track_reviews)
 
         if not raw_results:
@@ -356,6 +358,8 @@ def _create_app() -> FastAPI:
             max_results=request.max_results,
             track_reviews=request.track_reviews,
             auto_email_crawl=request.auto_email_crawl,
+            city=(request.city or "").strip() or None,
+            send_to_flare=request.send_to_flare,
         )
 
         # Start background processing
@@ -396,6 +400,8 @@ def _create_app() -> FastAPI:
                 completed_at=j.completed_at,
                 results_count=len(j.results) if j.results else 0,
                 auto_email_crawl=j.auto_email_crawl,
+                city=j.city,
+                flare_import=j.flare_import,
                 email_job_status=email_jobs_by_parent[j.job_id].status.value if j.job_id in email_jobs_by_parent else None,
                 emails_found=len(email_jobs_by_parent[j.job_id].results) if (j.job_id in email_jobs_by_parent and email_jobs_by_parent[j.job_id].results) else (0 if j.job_id in email_jobs_by_parent else None),
             )
@@ -428,6 +434,8 @@ def _create_app() -> FastAPI:
             job_id=job.job_id,
             status=job.status,
             prompt=job.prompt,
+            city=job.city,
+            flare_import=job.flare_import,
             created_at=job.created_at,
             completed_at=job.completed_at,
             results=job.results,
@@ -461,6 +469,8 @@ def _create_app() -> FastAPI:
             job_id=job.job_id,
             status=job.status,
             prompt=job.prompt,
+            city=job.city,
+            flare_import=job.flare_import,
             created_at=job.created_at,
             completed_at=job.completed_at,
             results=job.results,
@@ -1155,7 +1165,7 @@ def _create_app() -> FastAPI:
             is_running=True,
             profile_path="",
             headless=False,
-            locale="de-DE",
+            locale="en-US",
         )
 
     @app.post("/browser/restart", tags="Browser")
@@ -1197,11 +1207,12 @@ async def _process_job(job_id: str) -> None:
         results = await loop.run_in_executor(
             None,  # Uses default ProcessPoolExecutor
             run_crawl_in_process,
-            job.prompt,
+            f"{job.prompt} in {job.city}" if job.city else job.prompt,
             job.output_format,
             job.headless,
             job.locale,
             job.track_reviews,
+            job.max_results,
         )
 
         await queue_manager.complete_job(job_id, results)
@@ -1262,20 +1273,22 @@ async def _process_email_job(job_id: str) -> None:
         email_config = EmailCrawlerConfig(
             headless=True,
             chrome_profile_path=email_job.chrome_profile_path,
-            page_timeout=15000,
+            page_timeout=12000,
             crawl_delay=1.5,
             max_pages_per_domain=20,
         )
 
-        # Run the email crawl
-        emails = await extract_emails_from_websites(
+        # Run the email crawl (also notes each site's builder and any owner name)
+        emails, sites = await crawl_sites_for_leads(
             websites=email_job.websites,
             job_id=email_job.parent_job_id,
             config=email_config,
         )
 
-        await queue_manager.complete_email_job(job_id, emails)
+        await queue_manager.complete_email_job(job_id, emails, sites)
         logger.info("Email job %s completed: %d emails found", job_id[:8], len(emails))
+
+        await _send_leads_to_flare(email_job.parent_job_id)
 
     except Exception as e:
         logger.exception("Email job %s failed: %s", job_id[:8], e)
@@ -1285,6 +1298,19 @@ async def _process_email_job(job_id: str) -> None:
         email_job_obj = queue_manager._email_jobs.get(job_id)
         if email_job_obj:
             await queue_manager.set_failed_email_status_for_parent(email_job_obj.parent_job_id)
+
+
+async def _send_leads_to_flare(parent_job_id: str) -> None:
+    """Send a finished crawl's leads (has an email, not a chain, not far off) to Flare."""
+    parent = await queue_manager.get_crawl_job(parent_job_id)
+    if not parent or not parent.send_to_flare or not parent.results:
+        return
+    leads, left_out = leads_to_send(parent.results)
+    loop = asyncio.get_event_loop()
+    outcome = await loop.run_in_executor(None, send_to_flare, leads, source_name(parent.prompt, parent.city or ""))
+    outcome.update({"sent": len(leads), "left_out": left_out, "at": datetime.now(timezone.utc).isoformat()})
+    logger.info("Flare import for job %s: %s", parent_job_id[:8], outcome)
+    await queue_manager.set_flare_import(parent_job_id, outcome)
 
 
 def start_server(host: str = "0.0.0.0", port: int = 8000) -> None:

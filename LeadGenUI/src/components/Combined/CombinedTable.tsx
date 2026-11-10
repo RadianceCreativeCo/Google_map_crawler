@@ -379,8 +379,26 @@ export default function CombinedTable({ refreshTrigger }: CombinedTableProps) {
                           <TableCell>
                             <StatusBadge status={job.status} />
                           </TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {job.prompt}
+                          <TableCell className="max-w-xs">
+                            <div className="truncate">
+                              {job.prompt}
+                              {job.city ? <span className="text-muted-foreground"> · {job.city}</span> : null}
+                            </div>
+                            {job.flare_import ? (
+                              <div
+                                className={`text-[11px] truncate ${job.flare_import.error ? "text-red-600" : "text-emerald-600"}`}
+                                title={job.flare_import.error || undefined}
+                              >
+                                {job.flare_import.error
+                                  ? `Flare: ${job.flare_import.error}`
+                                  : `Flare: ${job.flare_import.added ?? 0} added, ${job.flare_import.already_there ?? 0} already there`}
+                                {job.flare_import.left_out ? (
+                                  <span className="text-muted-foreground">
+                                    {` · left out ${job.flare_import.left_out.no_email ?? 0} no email, ${job.flare_import.left_out.chain ?? 0} chains, ${job.flare_import.left_out.outside_area ?? 0} far away`}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </TableCell>
                           <TableCell className="text-center">
                             {job.results_count ?? 0}
@@ -500,6 +518,9 @@ export default function CombinedTable({ refreshTrigger }: CombinedTableProps) {
                                           <TableHead>Email Status</TableHead>
                                           <TableHead>Category</TableHead>
                                           <TableHead>Rating</TableHead>
+                                          <TableHead>Owner</TableHead>
+                                          <TableHead>Builder</TableHead>
+                                          <TableHead>Lead</TableHead>
                                         </TableRow>
                                       </TableHeader>
                                       <TableBody>
@@ -595,6 +616,23 @@ export default function CombinedTable({ refreshTrigger }: CombinedTableProps) {
                                               ) : (
                                                 "-"
                                               )}
+                                            </TableCell>
+                                            <TableCell className="max-w-[140px] truncate text-xs" title={row.owner_source || undefined}>
+                                              {row.owner_name || "-"}
+                                            </TableCell>
+                                            <TableCell className="max-w-[120px] truncate text-xs">
+                                              {row.website_builder || "-"}
+                                            </TableCell>
+                                            <TableCell className="max-w-[160px] truncate text-xs" title={row.chain_reason || row.chain_note || undefined}>
+                                              {row.chain
+                                                ? "Chain"
+                                                : row.outside_area
+                                                  ? `Far away${row.miles_away ? ` (${row.miles_away} mi)` : ""}`
+                                                  : row.email_status === "completed" && !(row.emails && row.emails.length)
+                                                    ? "No email"
+                                                    : row.emails && row.emails.length
+                                                      ? "Lead"
+                                                      : "-"}
                                             </TableCell>
                                           </TableRow>
                                         ))}
